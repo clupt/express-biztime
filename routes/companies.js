@@ -17,20 +17,33 @@ router.get("/", async function (req, res) {
   return res.json({ companies });
 });
 
-/**GET "/:code" => Returns {company: {code, name, description}}, throws 404 if
+/**GET "/:code" => Returns
+ * {company: {code, name, description, invoices: [id...]}}, throws 404 if
  * code not in db
  */
 router.get("/:code", async function (req, res) {
   const code = req.params.code;
 
-  const results = await db.query(
+  const companyResults = await db.query(
     `SELECT code, name, description
       FROM companies
       WHERE code = $1`, [code]
   );
 
-  const company = results.rows[0];
+  const invoiceResults = await db.query(
+    `SELECT id
+      FROM invoices AS i
+        JOIN companies AS c ON i.comp_code = c.code
+        WHERE c.code = $1`,
+    [code]
+  );
+
+  const company = companyResults.rows[0];
   if (!company) throw new NotFoundError();
+
+  const invoices = invoiceResults.rows.map(i => i.id);
+  company.invoices = invoices
+
   return res.json({ company });
 });
 

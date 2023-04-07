@@ -10,7 +10,7 @@ const db = require("../db");
 router.get("/", async function (req, res) {
   const results = await db.query(
     `SELECT id, comp_code
-      FROM invoices`
+      FROM invoices` // add ordering
   );
 
   const invoices = results.rows;
@@ -21,7 +21,7 @@ router.get("/", async function (req, res) {
 router.get("/:id", async function (req, res) {
   const id = req.params.id;
   const resultInvoice = await db.query(
-    `SELECT id, amt, paid, add_date, paid_date
+    `SELECT id, amt, paid, add_date, paid_date, comp_code
       FROM invoices
       WHERE id = $1`,
     [id]
@@ -32,19 +32,19 @@ router.get("/:id", async function (req, res) {
     `SELECT code, name, description
       FROM companies as c
         JOIN invoices as i ON c.code = i.comp_code
-      WHERE i.id = $1`,
+      WHERE i.id = $1`, // no need for join
     [id]
   );
-
+  // catch 404
   invoice.company = resultCompany.rows[0];
   return res.json({ invoice });
 });
 
-/** POST "/"  => Returns {invoice: {id, comp_code, amt, paid, add ... */
+/** POST "/"  => Returns {invoice: {id, comp_code, amt, paid, add ... UPDATE TO INCLUDE REQUIREMENTS*/
 router.post("/", async function (req, res) {
-  //TODO: or req.body Object.keys length === 0
-  if (!req.body) throw new BadRequestError();
-  console.log("bodyBODY=", req.body);
+  if (req.body === undefined || Object.keys(req.body) === 0) {
+    throw new BadRequestError();
+  };
 
   const { comp_code, amt } = req.body;
   const results = await db.query(
@@ -55,14 +55,13 @@ router.post("/", async function (req, res) {
   );
 
   const invoice = results.rows[0];
-  // if (!results.rows[0]) throw new NotFoundError();
   return res.json({ invoice });
 });
 
 
 /** PUT "/:id" =>
  * Takes JSON body of {amt} Returns  {invoice: {id, comp_code, amt, paid, a...*/
-router.put("/:id", async function(req,res){
+router.put("/:id", async function (req, res) {
   let { amt } = req.body;
   const id = req.params.id;
 
@@ -72,23 +71,23 @@ router.put("/:id", async function(req,res){
       WHERE id = $2
       RETURNING id, comp_code, amt, paid, add_date, paid_date`,
     [amt, id]
-  )
+  );
   const invoice = results.rows[0];
-  if(!invoice) throw new NotFoundError();
+  if (!invoice) throw new NotFoundError(); // Update error w/ message
   return res.json({ invoice });
-})
+});
 
 /** DELETE "/:id" => Returns: {status: "deleted"} or 404 if not found*/
-router.delete("/:id", async function(req, res){
+router.delete("/:id", async function (req, res) {
   const results = await db.query(
     `DELETE FROM invoices
         WHERE id = $1
         RETURNING id`, [req.params.id]
   );
 
-  if (!results.rows[0]) throw new NotFoundError();
+  if (!results.rows[0]) throw new NotFoundError(); // Update error w/ message
   return res.json({ status: "Deleted" });
 
-})
+});
 
 module.exports = router;
